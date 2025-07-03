@@ -1,0 +1,6 @@
+scapy
+scikit-learn
+joblib
+flask
+requests
+python-whois
