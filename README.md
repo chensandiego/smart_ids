@@ -1,5 +1,8 @@
 # smart_ids
 
+the repo only consider run on a single machine which is not scale out.
+However, I have created a new version which adopts distribution design. It is in zip file.
+
 will process wireshark pcap file to determine any potential threat
 
 To use this feature, run the following command:
