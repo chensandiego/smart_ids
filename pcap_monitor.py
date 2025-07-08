@@ -4,8 +4,8 @@ import os
 from scapy.all import rdpcap
 from detector import packet_handler
 
-PCAP_DIR = "/Users/chen/Desktop/smart_ids_full/wireshark_pcapoutput"
-PROCESSED_DIR = "/Users/chen/Desktop/smart_ids_full/processed_pcaps"
+PCAP_DIR = "/Users/chen/Desktop/smart_ids/wireshark_pcapoutput"
+PROCESSED_DIR = "/Users/chen/Desktop/smart_ids/processed_pcaps"
 
 def process_pcap(file_path):
     print(f"📦 Processing PCAP file: {file_path}")
