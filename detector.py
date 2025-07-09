@@ -4,6 +4,7 @@ from joblib import load
 import time
 import json
 import re
+import datetime
 from database import insert_alert
 from notifications import send_line_notification, send_slack_notification, export_to_csv
 from enrichment import get_whois_info
@@ -62,6 +63,15 @@ def raise_alert(pkt, reason):
     send_line_notification(alert)
     send_slack_notification(alert)
     export_to_csv(alert)
+
+    # Convert datetime objects to strings for JSON serialization
+    if whois_info:
+        for key, value in whois_info.items():
+            if isinstance(value, list):
+                whois_info[key] = [str(v) for v in value]
+            elif isinstance(value, datetime.datetime):
+                whois_info[key] = value.isoformat()
+
     print("[ALERT]", json.dumps(alert, ensure_ascii=False))
 
 def packet_handler(pkt):
