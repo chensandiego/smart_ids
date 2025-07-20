@@ -3,8 +3,11 @@ import sqlite3
 from datetime import datetime
 from config import DB_NAME
 
+conn = None
+
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
+    global conn
+    conn = sqlite3.connect(DB_NAME, check_same_thread=False)
     c = conn.cursor()
     c.execute('''
         CREATE TABLE IF NOT EXISTS alerts (
@@ -12,30 +15,26 @@ def init_db():
             timestamp TEXT,
             src TEXT,
             dst TEXT,
-            reason TEXT
+            reason TEXT,
+            hostname TEXT
         )
     ''')
     conn.commit()
-    conn.close()
 
-def insert_alert(src, dst, reason):
+def insert_alert(src, dst, reason, hostname):
     try:
-        conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        c.execute("INSERT INTO alerts (timestamp, src, dst, reason) VALUES (?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), src, dst, reason))
+        c.execute("INSERT INTO alerts (timestamp, src, dst, reason, hostname) VALUES (?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), src, dst, reason, hostname))
         conn.commit()
-        conn.close()
     except sqlite3.Error as e:
         print(f"Database error: {e}")
 
 def get_alerts():
     try:
-        conn = sqlite3.connect(DB_NAME)
         c = conn.cursor()
-        c.execute("SELECT timestamp, src, dst, reason FROM alerts ORDER BY timestamp DESC")
+        c.execute("SELECT timestamp, src, dst, reason, hostname FROM alerts ORDER BY timestamp DESC")
         alerts = c.fetchall()
-        conn.close()
         return alerts
     except sqlite3.Error as e:
         print(f"Database error: {e}")

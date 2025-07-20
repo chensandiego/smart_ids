@@ -4,3 +4,4 @@ joblib
 flask
 requests
 python-whois
+tensorflow

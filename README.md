@@ -1,30 +1,60 @@
 # smart_ids
 
-the repo only consider run on a single machine which is not scale out.
-However, I have created a new version which adopts distribution design. It is in zip file.
+This repository contains an Intrusion Detection System (IDS) designed to process Wireshark PCAP files to identify potential threats. While the initial version focused on single-machine operation, this enhanced version incorporates more advanced detection capabilities.
 
-will process wireshark pcap file to determine any potential threat
+## How to Use
 
-To use this feature, run the following command:
+### Configuration
 
-1 python ids.py --mode monitor
+Before running the application, you need to configure the following environment variables:
 
-This will start the monitoring process. Any new PCAP files that are added to the wireshark_pcapoutput directory will be processed,
-and any threats will be detected. The processed files will then be moved to the processed_pcaps directory.
+*   `LINE_TOKEN`: Your Line Notify token for receiving notifications.
+*   `SLACK_WEBHOOK`: Your Slack webhook URL for receiving notifications.
+*   `PCAP_DIR`: The directory to monitor for new PCAP files (defaults to `wireshark_pcapoutput`).
+*   `PROCESSED_DIR`: The directory to move processed PCAP files to (defaults to `processed_pcaps`).
 
-I recommend you to test this new feature by adding some PCAP files to the wireshark_pcapoutput directory.
+### Running the Application
 
-   * Core Logic: ids.py is the main entry point. It can run in three
-     modes: live (real-time monitoring), pcap (analyzing a file), and
-     monitor (monitoring a directory for new pcap files).
-   * Detection: detector.py contains the core detection logic. It uses a
-     machine learning model (isolation_forest_model.joblib) and Suricata
-     rules to analyze packets and raise alerts.
-   * Alerts: When an alert is raised, the raise_alert function in
-     detector.py is called. This function saves the alert to a database
-     (alerts.db), sends notifications via Line and Slack, and exports the
-     alert to a CSV file.
-   * Dependencies: The project uses scapy, scikit-learn, joblib, flask,
-     requests, and python-whois.
-   * Configuration: config.py stores configuration settings, including
-     database name, rule paths, and notification service tokens.
+To start the monitoring process, run the following command:
+
+```bash
+python ids.py --mode monitor
+```
+
+This will monitor the `wireshark_pcapoutput` directory for new PCAP files. Any new files added will be processed, and threats will be detected. Processed files are then moved to the `processed_pcaps` directory.
+
+**Recommendation:** Test this feature by adding some PCAP files to the `wireshark_pcapoutput` directory.
+
+## Core Components and Enhancements
+
+*   **Core Logic:** `ids.py` is the main entry point, supporting three modes: `live` (real-time monitoring), `pcap` (analyzing a single file), and `monitor` (monitoring a directory for new PCAP files).
+
+*   **Detection:** `detector.py` contains the core detection logic. It now uses:
+    *   **Enhanced ML Model (Autoencoder):** Replaced the Isolation Forest with a TensorFlow Keras Autoencoder for more sophisticated anomaly detection. This model learns patterns from "normal" network traffic.
+    *   **Suricata Rules:** Continues to use Suricata rules for signature-based threat detection.
+
+*   **Alerts:** When an alert is raised, the `raise_alert` function in `detector.py` is called. This function:
+    *   Saves the alert to a database (`alerts.db`).
+    *   Sends notifications via Line and Slack.
+    *   Exports the alert to a CSV file.
+    *   **Threat Intelligence Enrichment:** Alerts are now enriched with information from external threat intelligence feeds (e.g., Abuse.ch Feodo Tracker). Source and destination IPs are checked against known malicious IP blacklists, and the alert includes flags (`is_src_malicious`, `is_dst_malicious`) if a match is found.
+    *   **DNS Lookup:** Performs a reverse DNS lookup to identify the hostname of the source IP address, providing more context for threat analysis.
+
+*   **Behavioral Baselines:** The system now supports dynamic anomaly thresholding based on learned normal behavior:
+    *   **Learning Mode:** Set `LEARNING_MODE = True` in `config.py` and run `ids.py` with normal traffic. The system will log Mean Squared Error (MSE) values to `mse_values.csv`.
+    *   **Threshold Training:** Run `python train_threshold.py` to calculate a dynamic anomaly threshold (e.g., 99th percentile of collected MSEs) and save it to `model/anomaly_threshold.txt`.
+    *   **Detection Mode:** Set `LEARNING_MODE = False` in `config.py`. The system will load the calculated threshold for real-time anomaly detection.
+
+*   **Dependencies:** The project now uses `scapy`, `scikit-learn`, `joblib`, `flask`, `requests`, `python-whois`, and `tensorflow`.
+
+*   **Configuration:** `config.py` stores configuration settings, including database name, rule paths, notification service tokens, and the `LEARNING_MODE` flag for behavioral baselines.
+
+## Model Training
+
+To train the Autoencoder model, run:
+
+```bash
+python train_model.py
+```
+
+Ensure you have representative "normal" PCAP files in the `wireshark_pcapoutput` directory before training. The trained model (`autoencoder_model.h5`) and the feature scaler (`scaler.joblib`) will be saved in the `model/` directory.
