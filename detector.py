@@ -62,7 +62,7 @@ def match_suricata_signature(pkt):
             return sig['msg']
     return None
 
-def raise_alert(pkt, reason):
+def raise_alert(pkt, reason, attack_type=None):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     src = pkt[IP].src if IP in pkt else "unknown"
     dst = pkt[IP].dst if IP in pkt else "unknown"
@@ -88,7 +88,7 @@ def raise_alert(pkt, reason):
     pcap_filename = f"alerts/{timestamp.replace(':', '-')}-{src}.pcap"
     wrpcap(pcap_filename, pkt)
 
-    insert_alert(src, dst, reason, hostname)
+    insert_alert(src, dst, reason, hostname, attack_type)
     send_line_notification(alert)
     send_slack_notification(alert)
     export_to_csv(alert)
@@ -108,7 +108,7 @@ def packet_handler(pkt):
         return
     msg = match_suricata_signature(pkt)
     if msg:
-        raise_alert(pkt, f"簽章比對：{msg}")
+        raise_alert(pkt, f"簽章比對：{msg}", attack_type="Signature Match")
         return
 
     features = extract_features(pkt)
@@ -130,4 +130,4 @@ def packet_handler(pkt):
             writer = csv.writer(f)
             writer.writerow([mse[0]])
     elif mse[0] > ANOMALY_THRESHOLD:
-        raise_alert(pkt, f"異常流量偵測 (MSE: {mse[0]:.4f})")
+        raise_alert(pkt, f"異常流量偵測 (MSE: {mse[0]:.4f})", attack_type="Anomaly Detection")

@@ -16,16 +16,20 @@ def init_db():
             src TEXT,
             dst TEXT,
             reason TEXT,
-            hostname TEXT
+            hostname TEXT,
+            attack_type TEXT
         )
+    ''')
+    c.execute('''
+        ALTER TABLE alerts ADD COLUMN attack_type TEXT
     ''')
     conn.commit()
 
-def insert_alert(src, dst, reason, hostname):
+def insert_alert(src, dst, reason, hostname, attack_type=None):
     try:
         c = conn.cursor()
-        c.execute("INSERT INTO alerts (timestamp, src, dst, reason, hostname) VALUES (?, ?, ?, ?, ?)", 
-                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), src, dst, reason, hostname))
+        c.execute("INSERT INTO alerts (timestamp, src, dst, reason, hostname, attack_type) VALUES (?, ?, ?, ?, ?, ?)", 
+                  (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), src, dst, reason, hostname, attack_type))
         conn.commit()
     except sqlite3.Error as e:
         print(f"Database error: {e}")
@@ -33,7 +37,7 @@ def insert_alert(src, dst, reason, hostname):
 def get_alerts():
     try:
         c = conn.cursor()
-        c.execute("SELECT timestamp, src, dst, reason, hostname FROM alerts ORDER BY timestamp DESC")
+        c.execute("SELECT timestamp, src, dst, reason, hostname, attack_type FROM alerts ORDER BY timestamp DESC")
         alerts = c.fetchall()
         return alerts
     except sqlite3.Error as e:

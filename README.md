@@ -40,6 +40,8 @@ This will monitor the `wireshark_pcapoutput` directory for new PCAP files. Any n
     *   **Threat Intelligence Enrichment:** Alerts are now enriched with information from external threat intelligence feeds (e.g., Abuse.ch Feodo Tracker). Source and destination IPs are checked against known malicious IP blacklists, and the alert includes flags (`is_src_malicious`, `is_dst_malicious`) if a match is found.
     *   **DNS Lookup:** Performs a reverse DNS lookup to identify the hostname of the source IP address, providing more context for threat analysis.
 
+*   **Indication of Attack (IoA):** A new `attack_type` column has been added to the `alerts` table in `alerts.db`. This column categorizes the type of attack detected (e.g., "Signature Match", "Anomaly Detection") and is displayed on the dashboard for quick visualization of attack trends.
+
 *   **Behavioral Baselines:** The system now supports dynamic anomaly thresholding based on learned normal behavior:
     *   **Learning Mode:** Set `LEARNING_MODE = True` in `config.py` and run `ids.py` with normal traffic. The system will log Mean Squared Error (MSE) values to `mse_values.csv`.
     *   **Threshold Training:** Run `python train_threshold.py` to calculate a dynamic anomaly threshold (e.g., 99th percentile of collected MSEs) and save it to `model/anomaly_threshold.txt`.
@@ -58,3 +60,13 @@ python train_model.py
 ```
 
 Ensure you have representative "normal" PCAP files in the `wireshark_pcapoutput` directory before training. The trained model (`autoencoder_model.h5`) and the feature scaler (`scaler.joblib`) will be saved in the `model/` directory.
+
+## Generating Test Traffic
+
+To test the IDS with various attack types, you can use the following scripts:
+
+*   `generate_syn_flood.py`: Generates SYN flood traffic to simulate a Denial-of-Service (DoS) attack.
+*   `generate_port_scan.py`: Generates port scan traffic to simulate a reconnaissance attack.
+*   `generate_malware_traffic.py`: Generates traffic with a specific payload to simulate malware activity. (Requires a corresponding Suricata rule to trigger an alert, e.g., for "MALWARE_SIGNATURE_TEST").
+
+**Note:** Ensure your `ids.py` is running and monitoring traffic when generating test traffic. You may need to adjust the target IP addresses in the generation scripts to match your monitoring environment.
