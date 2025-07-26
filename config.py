@@ -23,5 +23,13 @@ if not SLACK_WEBHOOK:
 WEB_HOST = "127.0.0.1"
 WEB_PORT = 5000
 
+# Brute Force Detection settings
+BRUTE_FORCE_THRESHOLD = 100  # Number of failed attempts
+BRUTE_FORCE_TIME_WINDOW = 60  # Time window in seconds
+
+# DNS Tunneling Detection settings
+DNS_TUNNELING_THRESHOLD_QUERY_LENGTH = 100  # Max length of DNS query name to consider suspicious
+DNS_TUNNELING_RATE_LIMIT = 50  # Max DNS queries per second from a single source
+
 # Behavioral Baseline settings
 LEARNING_MODE = False  # Set to True to collect MSE values for threshold training

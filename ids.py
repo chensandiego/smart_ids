@@ -3,6 +3,9 @@ from scapy.all import sniff, rdpcap
 from detector import packet_handler
 from database import init_db
 from pcap_monitor import monitor_directory
+from train_model import train_model
+import threading
+import time
 
 def live_mode(interface=None):
     print("🚨 啟動即時監控模式...")
@@ -22,9 +25,23 @@ if __name__ == "__main__":
     parser.add_argument("--file", help="PCAP 檔案路徑（僅限 pcap 模式）")
     parser.add_argument("--interface", help="指定監控的網卡")
     parser.add_argument("--web", action="store_true", help="啟動 Web 儀表板")
+    parser.add_argument("--retrain-interval", type=int, help="自動重新訓練模型的時間間隔 (秒)")
 
     args = parser.parse_args()
     init_db()
+
+    def retrain_loop(interval):
+        while True:
+            print(f"等待 {interval} 秒後重新訓練模型...")
+            time.sleep(interval)
+            print("開始自動重新訓練模型...")
+            train_model()
+            print("自動重新訓練模型完成。")
+
+    if args.retrain_interval:
+        retrain_thread = threading.Thread(target=retrain_loop, args=(args.retrain_interval,))
+        retrain_thread.daemon = True  # Allow the main program to exit even if the thread is running
+        retrain_thread.start()
 
     if args.web:
         start_web()

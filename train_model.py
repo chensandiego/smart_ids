@@ -6,6 +6,7 @@ from tensorflow.keras.layers import Input, Dense
 from tensorflow.keras.callbacks import EarlyStopping
 import numpy as np
 from joblib import dump
+from train_threshold import train_threshold
 
 PCAP_DIR = "wireshark_pcapoutput"
 MODEL_PATH = "model/autoencoder_model.h5"
@@ -77,6 +78,9 @@ def train_model():
     print(f"Saving Autoencoder model to: {MODEL_PATH}")
     autoencoder.save(MODEL_PATH)
     print("Model training complete.")
+
+    # After training the model, retrain the anomaly threshold
+    train_threshold()
 
 if __name__ == "__main__":
     train_model()

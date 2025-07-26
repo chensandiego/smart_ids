@@ -1,4 +1,4 @@
-from scapy.all import IP, wrpcap
+from scapy.all import IP, TCP, Raw, DNS, DNSQR, wrpcap
 from tensorflow.keras.models import load_model
 from joblib import load
 import numpy as np
@@ -11,6 +11,15 @@ from notifications import send_line_notification, send_slack_notification, expor
 from enrichment import get_whois_info, is_ip_malicious, get_hostname
 from config import LEARNING_MODE
 import csv
+from collections import defaultdict
+from datetime import datetime, timedelta
+from config import BRUTE_FORCE_THRESHOLD, BRUTE_FORCE_TIME_WINDOW, DNS_TUNNELING_THRESHOLD_QUERY_LENGTH, DNS_TUNNELING_RATE_LIMIT
+
+# Dictionary to store failed login attempts: {ip: {'count': 0, 'last_attempt': datetime.min}}
+failed_attempts = defaultdict(lambda: {'count': 0, 'last_attempt': datetime.min})
+
+# Dictionary to store DNS query counts for rate limiting: {ip: [(timestamp, count)]}
+dns_query_counts = defaultdict(lambda: {'count': 0, 'last_query_time': datetime.min})
 
 # Load the trained Autoencoder model and scaler
 autoencoder_model = load_model("model/autoencoder_model.h5")
@@ -62,6 +71,56 @@ def match_suricata_signature(pkt):
             return sig['msg']
     return None
 
+def check_brute_force(pkt):
+    if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+        payload = pkt[Raw].load.decode(errors='ignore')
+        
+        # Check for generic login attempt patterns
+        is_login_attempt = "password" in payload.lower() or "login failed" in payload.lower()
+
+        # Check for SSH specific login failures (port 22 and common SSH failure messages)
+        is_ssh_login_failure = False
+        if pkt[TCP].dport == 22 or pkt[TCP].sport == 22:
+            if "authentication failed" in payload.lower() or "permission denied" in payload.lower():
+                is_ssh_login_failure = True
+
+        if is_login_attempt or is_ssh_login_failure:
+            src_ip = pkt[IP].src
+            current_time = datetime.now()
+
+            # Reset count if last attempt was outside the time window
+            if (current_time - failed_attempts[src_ip]['last_attempt']).total_seconds() > BRUTE_FORCE_TIME_WINDOW:
+                failed_attempts[src_ip]['count'] = 0
+
+            failed_attempts[src_ip]['count'] += 1
+            failed_attempts[src_ip]['last_attempt'] = current_time
+
+            if failed_attempts[src_ip]['count'] >= BRUTE_FORCE_THRESHOLD:
+                raise_alert(pkt, f"Brute Force Attack detected from {src_ip} (failed attempts: {failed_attempts[src_ip]['count']})", attack_type="Brute Force")
+                # Optionally, reset count after alert to prevent repeated alerts for the same ongoing attack
+                failed_attempts[src_ip]['count'] = 0
+
+def check_dns_tunneling(pkt):
+    if pkt.haslayer(DNS) and pkt.qd:  # Check if it's a DNS packet and has a question section
+        for qd in pkt.qd:
+            qname = qd.qname.decode(errors='ignore').rstrip('.')
+            src_ip = pkt[IP].src
+
+            # Rule 1: Unusually long DNS query names
+            if len(qname) > DNS_TUNNELING_THRESHOLD_QUERY_LENGTH:
+                raise_alert(pkt, f"DNS Tunneling suspected: unusually long query name ({len(qname)} chars) from {src_ip} for {qname}", attack_type="DNS Tunneling")
+
+            # Rule 2: High rate of DNS queries from a single source
+            current_time = datetime.now()
+            if (current_time - dns_query_counts[src_ip]['last_query_time']).total_seconds() > 1: # Reset count if more than 1 second passed
+                dns_query_counts[src_ip]['count'] = 0
+            
+            dns_query_counts[src_ip]['count'] += 1
+            dns_query_counts[src_ip]['last_query_time'] = current_time
+
+            if dns_query_counts[src_ip]['count'] > DNS_TUNNELING_RATE_LIMIT:
+                raise_alert(pkt, f"DNS Tunneling suspected: high query rate ({dns_query_counts[src_ip]['count']} queries/sec) from {src_ip}", attack_type="DNS Tunneling")
+
 def raise_alert(pkt, reason, attack_type=None):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     src = pkt[IP].src if IP in pkt else "unknown"
@@ -106,6 +165,13 @@ def raise_alert(pkt, reason, attack_type=None):
 def packet_handler(pkt):
     if IP not in pkt:
         return
+
+    # Check for brute force attempts
+    check_brute_force(pkt)
+
+    # Check for DNS tunneling attempts
+    check_dns_tunneling(pkt)
+
     msg = match_suricata_signature(pkt)
     if msg:
         raise_alert(pkt, f"簽章比對：{msg}", attack_type="Signature Match")
