@@ -162,12 +162,107 @@ def raise_alert(pkt, reason, attack_type=None):
 
     print("[ALERT]", json.dumps(alert, ensure_ascii=False))
 
+# SQL Injection patterns
+SQL_INJECTION_PATTERNS = [
+    r"(\b(union|select|insert|update|delete|from|where|and|or|exec|char|nchar|varchar|nvarchar|table|drop|alter|create)\b)",
+    r"(--|#|;)",
+    r"(\b(xp_cmdshell|sp_executesql)\b)",
+    r"(\b(information_schema|sysobjects|sysdatabases)\b)",
+    r"(\b(like|ilike|cast|convert|declare|waitfor|delay)\b)",
+    r"(\b(load_file|outfile|dumpfile)\b)",
+    r"(\b(sleep|benchmark)\b)",
+    r"(\b(or|and)\s+\d+\s*=\s*\d+)",
+    r"(\b(or|and)\s+\'[^']+\'\s*=\s*\'[^']+\')",
+]
+
+# XSS patterns
+XSS_PATTERNS = [
+    r"(<script>.*</script>)",
+    r"(<img src=.*onerror=.*>)",
+    r"(<body onload=.*>)",
+    r"(<iframe src=.*>)",
+    r"(<a href="javascript:.*">)",
+    r"(<style>.*</style>)",
+    r"(<link rel=.*href=.*>)",
+    r"(<object data=.*>)",
+    r"(<embed src=.*>)",
+    r"(<form action=.*>)",
+    r"(<input type=.*>)",
+    r"(<button formaction=.*>)",
+    r"(<video>.*<source onerror=.*>)",
+    r"(<audio>.*<source onerror=.*>)",
+    r"(<svg>.*<script>.*</script>.*</svg>)",
+    r"(<math>.*<script>.*</script>.*</math>)",
+    r"(<div style="background-image: url\(javascript:.*\)">)",
+    r"(<div style="behavior: url\(.*\)">)",
+    r"(<div style="binding: url\(.*\)">)",
+    r"(<div style="expression\(.*\)">)",
+    r"(<div style="-moz-binding: url\(.*\)">)",
+    r"(<div style="-o-binding: url\(.*\)">)",
+    r"(<div style="-webkit-binding: url\(.*\)">)",
+    r"(<div style="-ms-binding: url\(.*\)">)",
+    r"(<div style="-khtml-binding: url\(.*\)">)",
+    r"(<div style="-apple-binding: url\(.*\)">)",
+    r"(<div style="-sand-binding: url\(.*\)">)",
+    r"(<div style="-wap-binding: url\(.*\)">)",
+    r"(<div style="-rim-binding: url\(.*\)">)",
+    r"(<div style="-hp-binding: url\(.*\)">)",
+    r"(<div style="-a-binding: url\(.*\)">)",
+    r"(<div style="-b-binding: url\(.*\)">)",
+    r"(<div style="-c-binding: url\(.*\)">)",
+    r"(<div style="-d-binding: url\(.*\)">)",
+    r"(<div style="-e-binding: url\(.*\)">)",
+    r"(<div style="-f-binding: url\(.*\)">)",
+    r"(<div style="-g-binding: url\(.*\)">)",
+    r"(<div style="-h-binding: url\(.*\)">)",
+    r"(<div style="-i-binding: url\(.*\)">)",
+    r"(<div style="-j-binding: url\(.*\)">)",
+    r"(<div style="-l-binding: url\(.*\)">)",
+    r"(<div style="-m-binding: url\(.*\)">)",
+    r"(<div style="-n-binding: url\(.*\)">)",
+    r"(<div style="-p-binding: url\(.*\)">)",
+    r"(<div style="-q-binding: url\(.*\)">)",
+    r"(<div style="-r-binding: url\(.*\)">)",
+    r"(<div style="-s-binding: url\(.*\)">)",
+    r"(<div style="-t-binding: url\(.*\)">)",
+    r"(<div style="-u-binding: url\(.*\)">)",
+    r"(<div style="-v-binding: url\(.*\)">)",
+    r"(<div style="-w-binding: url\(.*\)">)",
+    r"(<div style="-x-binding: url\(.*\)">)",
+    r"(<div style="-y-binding: url\(.*\)">)",
+    r"(<div style="-z-binding: url\(.*\)">)",
+]
+
+def check_sql_injection(pkt):
+    if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+        payload = pkt[Raw].load.decode(errors='ignore').lower()
+        for pattern in SQL_INJECTION_PATTERNS:
+            if re.search(pattern, payload):
+                raise_alert(pkt, f"SQL Injection attempt detected from {pkt[IP].src}", attack_type="SQL Injection")
+                return True
+    return False
+
+def check_xss(pkt):
+    if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+        payload = pkt[Raw].load.decode(errors='ignore').lower()
+        for pattern in XSS_PATTERNS:
+            if re.search(pattern, payload):
+                raise_alert(pkt, f"XSS attempt detected from {pkt[IP].src}", attack_type="XSS")
+                return True
+    return False
+
 def packet_handler(pkt):
     if IP not in pkt:
         return
 
+    # Check for web-based attacks first
+    if check_sql_injection(pkt):
+        return
+    if check_xss(pkt):
+        return
+
     # Check for brute force attempts
-    check_brute_force(pkt)
+    check_brute_force(pkt):
 
     # Check for DNS tunneling attempts
     check_dns_tunneling(pkt)

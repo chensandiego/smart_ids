@@ -55,7 +55,7 @@ This will monitor the `wireshark_pcapoutput` directory for new PCAP files. Any n
 
 *   **Automated Model Retraining:** The system can now automatically retrain the anomaly detection model and recalculate the anomaly threshold at specified intervals, ensuring the model stays up-to-date with evolving network patterns.
 
-*   **Advanced Application Layer Protocol Analysis:** While current detection focuses on network and transport layers, future enhancements could include deeper parsing and analysis for common application-layer protocols (e.g., HTTP, DNS, FTP, SSH) to enable detection of more sophisticated attacks like SQL injection attempts, cross-site scripting, or DNS tunneling.
+*   **Advanced Application Layer Protocol Analysis:** The system has been enhanced to detect common web-based attacks. While earlier versions focused on network and transport layers, this update adds detection for SQL injection and Cross-Site Scripting (XSS) by inspecting HTTP traffic for malicious payloads. Future work could involve expanding this to other application-layer protocols like FTP and SSH.
 
 *   **Dependencies:** The project now uses `scapy`, `scikit-learn`, `joblib`, `flask`, `requests`, `python-whois`, and `tensorflow`.
 
@@ -78,5 +78,6 @@ To test the IDS with various attack types, you can use the following scripts:
 *   `generate_syn_flood.py`: Generates SYN flood traffic to simulate a Denial-of-Service (DoS) attack.
 *   `generate_port_scan.py`: Generates port scan traffic to simulate a reconnaissance attack.
 *   `generate_malware_traffic.py`: Generates traffic with a specific payload to simulate malware activity. (Requires a corresponding Suricata rule to trigger an alert, e.g., for "MALWARE_SIGNATURE_TEST").
+*   `generate_web_attacks.py`: Generates traffic that simulates SQL injection and XSS attacks.
 
 **Note:** Ensure your `ids.py` is running and monitoring traffic when generating test traffic. You may need to adjust the target IP addresses in the generation scripts to match your monitoring environment.
