@@ -34,10 +34,30 @@ def insert_alert(src, dst, reason, hostname, attack_type=None):
     except sqlite3.Error as e:
         print(f"Database error: {e}")
 
-def get_alerts():
+def get_alerts_by_filter(src_ip=None, dst_ip=None, attack_type=None, start_time=None, end_time=None):
     try:
         c = conn.cursor()
-        c.execute("SELECT timestamp, src, dst, reason, hostname, attack_type FROM alerts ORDER BY timestamp DESC")
+        query = "SELECT timestamp, src, dst, reason, hostname, attack_type FROM alerts WHERE 1=1"
+        params = []
+
+        if src_ip:
+            query += " AND src = ?"
+            params.append(src_ip)
+        if dst_ip:
+            query += " AND dst = ?"
+            params.append(dst_ip)
+        if attack_type:
+            query += " AND attack_type = ?"
+            params.append(attack_type)
+        if start_time:
+            query += " AND timestamp >= ?"
+            params.append(start_time)
+        if end_time:
+            query += " AND timestamp <= ?"
+            params.append(end_time)
+
+        query += " ORDER BY timestamp DESC"
+        c.execute(query, params)
         alerts = c.fetchall()
         return alerts
     except sqlite3.Error as e:

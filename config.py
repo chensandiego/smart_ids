@@ -33,3 +33,7 @@ DNS_TUNNELING_RATE_LIMIT = 50  # Max DNS queries per second from a single source
 
 # Behavioral Baseline settings
 LEARNING_MODE = False  # Set to True to collect MSE values for threshold training
+
+# ICMP Scan Detection settings
+ICMP_SWEEP_THRESHOLD = 10  # Number of unique hosts to trigger an alert
+ICMP_SWEEP_TIME_WINDOW = 60  # Time window in seconds

@@ -7,6 +7,28 @@
 </head>
 <body class="p-4">
     <h1>📊 入侵警示 Dashboard</h1>
+
+    <form method="get" class="row g-3 mt-3">
+        <div class="col-md-3">
+            <input type="text" name="src_ip" class="form-control" placeholder="Source IP">
+        </div>
+        <div class="col-md-3">
+            <input type="text" name="dst_ip" class="form-control" placeholder="Destination IP">
+        </div>
+        <div class="col-md-2">
+            <input type="text" name="attack_type" class="form-control" placeholder="Attack Type">
+        </div>
+        <div class="col-md-2">
+            <input type="datetime-local" name="start_time" class="form-control">
+        </div>
+        <div class="col-md-2">
+            <input type="datetime-local" name="end_time" class="form-control">
+        </div>
+        <div class="col-md-12">
+            <button type="submit" class="btn btn-primary">Filter</button>
+        </div>
+    </form>
+
     <table class="table table-bordered table-striped mt-3">
         <thead>
             <tr>

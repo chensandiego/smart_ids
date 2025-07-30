@@ -1,7 +1,8 @@
 scapy
+tensorflow
 scikit-learn
 joblib
 flask
 requests
 python-whois
-tensorflow
+numpy

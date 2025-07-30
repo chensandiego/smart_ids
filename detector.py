@@ -1,4 +1,4 @@
-from scapy.all import IP, TCP, Raw, DNS, DNSQR, wrpcap
+from scapy.all import IP, TCP, ICMP, Raw, DNS, DNSQR, wrpcap
 from tensorflow.keras.models import load_model
 from joblib import load
 import numpy as np
@@ -13,13 +13,16 @@ from config import LEARNING_MODE
 import csv
 from collections import defaultdict
 from datetime import datetime, timedelta
-from config import BRUTE_FORCE_THRESHOLD, BRUTE_FORCE_TIME_WINDOW, DNS_TUNNELING_THRESHOLD_QUERY_LENGTH, DNS_TUNNELING_RATE_LIMIT
+from config import BRUTE_FORCE_THRESHOLD, BRUTE_FORCE_TIME_WINDOW, DNS_TUNNELING_THRESHOLD_QUERY_LENGTH, DNS_TUNNELING_RATE_LIMIT, ICMP_SWEEP_THRESHOLD, ICMP_SWEEP_TIME_WINDOW
 
 # Dictionary to store failed login attempts: {ip: {'count': 0, 'last_attempt': datetime.min}}
 failed_attempts = defaultdict(lambda: {'count': 0, 'last_attempt': datetime.min})
 
 # Dictionary to store DNS query counts for rate limiting: {ip: [(timestamp, count)]}
 dns_query_counts = defaultdict(lambda: {'count': 0, 'last_query_time': datetime.min})
+
+# Dictionary to store ICMP sweep data: {ip: {'destinations': set(), 'last_request_time': datetime.min}}
+icmp_sweep_data = defaultdict(lambda: {'destinations': set(), 'last_request_time': datetime.min})
 
 # Load the trained Autoencoder model and scaler
 autoencoder_model = load_model("model/autoencoder_model.h5")
@@ -121,6 +124,17 @@ def check_dns_tunneling(pkt):
             if dns_query_counts[src_ip]['count'] > DNS_TUNNELING_RATE_LIMIT:
                 raise_alert(pkt, f"DNS Tunneling suspected: high query rate ({dns_query_counts[src_ip]['count']} queries/sec) from {src_ip}", attack_type="DNS Tunneling")
 
+from threat_intelligence import ThreatIntelligence
+
+ti = ThreatIntelligence(api_key="YOUR_VIRUSTOTAL_API_KEY")
+
+def check_ip_reputation(ip_address):
+    """Checks the IP reputation using the ThreatIntelligence class."""
+    reputation = ti.get_ip_reputation(ip_address)
+    if reputation and reputation["data"]["attributes"]["last_analysis_stats"]["malicious"] > 0:
+        return True
+    return False
+
 def raise_alert(pkt, reason, attack_type=None):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     src = pkt[IP].src if IP in pkt else "unknown"
@@ -132,6 +146,10 @@ def raise_alert(pkt, reason, attack_type=None):
     is_src_malicious = is_ip_malicious(src)
     is_dst_malicious = is_ip_malicious(dst)
 
+    # Real-time threat intelligence
+    src_ip_reputation = check_ip_reputation(src)
+    dst_ip_reputation = check_ip_reputation(dst)
+
     alert = {
         "time": timestamp,
         "src": src,
@@ -140,7 +158,9 @@ def raise_alert(pkt, reason, attack_type=None):
         "hostname": hostname,
         "whois": whois_info,
         "is_src_malicious": is_src_malicious,
-        "is_dst_malicious": is_dst_malicious
+        "is_dst_malicious": is_dst_malicious,
+        "src_ip_reputation": src_ip_reputation,
+        "dst_ip_reputation": dst_ip_reputation
     }
 
     # Save packet to PCAP file
@@ -181,7 +201,7 @@ XSS_PATTERNS = [
     r"(<img src=.*onerror=.*>)",
     r"(<body onload=.*>)",
     r"(<iframe src=.*>)",
-    r"(<a href="javascript:.*">)",
+    r"(<a href=\"javascript:.*\">)",
     r"(<style>.*</style>)",
     r"(<link rel=.*href=.*>)",
     r"(<object data=.*>)",
@@ -193,44 +213,44 @@ XSS_PATTERNS = [
     r"(<audio>.*<source onerror=.*>)",
     r"(<svg>.*<script>.*</script>.*</svg>)",
     r"(<math>.*<script>.*</script>.*</math>)",
-    r"(<div style="background-image: url\(javascript:.*\)">)",
-    r"(<div style="behavior: url\(.*\)">)",
-    r"(<div style="binding: url\(.*\)">)",
-    r"(<div style="expression\(.*\)">)",
-    r"(<div style="-moz-binding: url\(.*\)">)",
-    r"(<div style="-o-binding: url\(.*\)">)",
-    r"(<div style="-webkit-binding: url\(.*\)">)",
-    r"(<div style="-ms-binding: url\(.*\)">)",
-    r"(<div style="-khtml-binding: url\(.*\)">)",
-    r"(<div style="-apple-binding: url\(.*\)">)",
-    r"(<div style="-sand-binding: url\(.*\)">)",
-    r"(<div style="-wap-binding: url\(.*\)">)",
-    r"(<div style="-rim-binding: url\(.*\)">)",
-    r"(<div style="-hp-binding: url\(.*\)">)",
-    r"(<div style="-a-binding: url\(.*\)">)",
-    r"(<div style="-b-binding: url\(.*\)">)",
-    r"(<div style="-c-binding: url\(.*\)">)",
-    r"(<div style="-d-binding: url\(.*\)">)",
-    r"(<div style="-e-binding: url\(.*\)">)",
-    r"(<div style="-f-binding: url\(.*\)">)",
-    r"(<div style="-g-binding: url\(.*\)">)",
-    r"(<div style="-h-binding: url\(.*\)">)",
-    r"(<div style="-i-binding: url\(.*\)">)",
-    r"(<div style="-j-binding: url\(.*\)">)",
-    r"(<div style="-l-binding: url\(.*\)">)",
-    r"(<div style="-m-binding: url\(.*\)">)",
-    r"(<div style="-n-binding: url\(.*\)">)",
-    r"(<div style="-p-binding: url\(.*\)">)",
-    r"(<div style="-q-binding: url\(.*\)">)",
-    r"(<div style="-r-binding: url\(.*\)">)",
-    r"(<div style="-s-binding: url\(.*\)">)",
-    r"(<div style="-t-binding: url\(.*\)">)",
-    r"(<div style="-u-binding: url\(.*\)">)",
-    r"(<div style="-v-binding: url\(.*\)">)",
-    r"(<div style="-w-binding: url\(.*\)">)",
-    r"(<div style="-x-binding: url\(.*\)">)",
-    r"(<div style="-y-binding: url\(.*\)">)",
-    r"(<div style="-z-binding: url\(.*\)">)",
+    r"(<div style=\"background-image: url\\(javascript:.*\\)\">)",
+    r"(<div style=\"behavior: url\\(.*\\)\">)",
+    r"(<div style=\"binding: url\\(.*\\)\">)",
+    r"(<div style=\"expression\\(.*\\)\">)",
+    r"(<div style=\"-moz-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-o-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-webkit-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-ms-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-khtml-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-apple-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-sand-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-wap-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-rim-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-hp-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-a-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-b-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-c-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-d-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-e-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-f-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-g-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-h-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-i-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-j-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-l-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-m-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-n-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-p-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-q-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-r-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-s-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-t-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-u-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-v-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-w-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-x-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-y-binding: url\\(.*\\)\">)",
+    r"(<div style=\"-z-binding: url\\(.*\\)\">)",
 ]
 
 def check_sql_injection(pkt):
@@ -251,44 +271,67 @@ def check_xss(pkt):
                 return True
     return False
 
-def packet_handler(pkt):
-    if IP not in pkt:
-        return
+def check_icmp_scan(pkt):
+    """Checks for ICMP echo requests and replies."""
+    if pkt.haslayer(ICMP) and pkt[ICMP].type == 8:
+        src_ip = pkt[IP].src
+        dst_ip = pkt[IP].dst
+        current_time = datetime.now()
 
-    # Check for web-based attacks first
-    if check_sql_injection(pkt):
-        return
-    if check_xss(pkt):
-        return
+        if (current_time - icmp_sweep_data[src_ip]['last_request_time']).total_seconds() > ICMP_SWEEP_TIME_WINDOW:
+            icmp_sweep_data[src_ip]['destinations'] = {dst_ip}
+        else:
+            icmp_sweep_data[src_ip]['destinations'].add(dst_ip)
 
-    # Check for brute force attempts
-    check_brute_force(pkt):
+        icmp_sweep_data[src_ip]['last_request_time'] = current_time
 
-    # Check for DNS tunneling attempts
-    check_dns_tunneling(pkt)
+        if len(icmp_sweep_data[src_ip]['destinations']) >= ICMP_SWEEP_THRESHOLD:
+            raise_alert(pkt, f"ICMP Sweep detected from {src_ip}", attack_type="ICMP Sweep")
+            icmp_sweep_data[src_ip]['destinations'] = set()
+            return True
+    return False
 
+def handle_signature_match(pkt):
+    """Checks for Suricata signature matches."""
     msg = match_suricata_signature(pkt)
     if msg:
-        raise_alert(pkt, f"簽章比對：{msg}", attack_type="Signature Match")
-        return
+        raise_alert(pkt, f"Signature Match: {msg}", attack_type="Signature Match")
+        return True
+    return False
 
+def handle_anomaly_detection(pkt):
+    """Performs anomaly detection using the autoencoder model."""
     features = extract_features(pkt)
     if features is None:
         return
 
-    # Scale the features using the loaded scaler
     scaled_features = scaler.transform(features)
-
-    # Get the reconstruction from the autoencoder
     reconstructed_features = autoencoder_model.predict(scaled_features)
-
-    # Calculate the reconstruction error (Mean Squared Error)
     mse = np.mean(np.power(scaled_features - reconstructed_features, 2), axis=1)
 
-    # Check if the reconstruction error exceeds the anomaly threshold
     if LEARNING_MODE:
         with open(MSE_LOG_FILE, "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([mse[0]])
     elif mse[0] > ANOMALY_THRESHOLD:
-        raise_alert(pkt, f"異常流量偵測 (MSE: {mse[0]:.4f})", attack_type="Anomaly Detection")
+        raise_alert(pkt, f"Anomaly Detection (MSE: {mse[0]:.4f})", attack_type="Anomaly Detection")
+
+def packet_handler(pkt):
+    """Main packet handler function."""
+    if IP not in pkt:
+        return
+
+    if check_icmp_scan(pkt):
+        return
+    if check_sql_injection(pkt):
+        return
+    if check_xss(pkt):
+        return
+    if check_brute_force(pkt):
+        return
+    if check_dns_tunneling(pkt):
+        return
+    if handle_signature_match(pkt):
+        return
+
+    handle_anomaly_detection(pkt)

@@ -12,6 +12,13 @@ Before running the application, you need to configure the following environment 
 *   `SLACK_WEBHOOK`: Your Slack webhook URL for receiving notifications.
 *   `PCAP_DIR`: The directory to monitor for new PCAP files (defaults to `wireshark_pcapoutput`).
 *   `PROCESSED_DIR`: The directory to move processed PCAP files to (defaults to `processed_pcaps`).
+*   `VIRUSTOTAL_API_KEY`: Your VirusTotal API key for real-time threat intelligence.
+
+### Installation
+
+```bash
+pip install -r requirements.txt
+```
 
 ### Running the Application
 
@@ -38,13 +45,18 @@ This will monitor the `wireshark_pcapoutput` directory for new PCAP files. Any n
     *   **Enhanced ML Model (Autoencoder):** Replaced the Isolation Forest with a TensorFlow Keras Autoencoder for more sophisticated anomaly detection. This model learns patterns from "normal" network traffic.
     *   **Suricata Rules:** Continues to use Suricata rules for signature-based threat detection.
     *   **Brute Force Detection:** Implemented logic to detect brute force attacks by tracking failed login attempts within a configurable time window, including specific detection for SSH login failures.
+    *   **ICMP Scan Detection:** Detects ICMP sweeps by tracking echo requests to multiple hosts from a single source within a specific time window.
 
 *   **Alerts:** When an alert is raised, the `raise_alert` function in `detector.py` is called. This function:
     *   Saves the alert to a database (`alerts.db`).
     *   Sends notifications via Line and Slack.
     *   Exports the alert to a CSV file.
     *   **Threat Intelligence Enrichment:** Alerts are now enriched with information from multiple external threat intelligence feeds (e.g., Abuse.ch Feodo Tracker, SANS DShield). Source and destination IPs are checked against known malicious IP blacklists, and the alert includes flags (`is_src_malicious`, `is_dst_malicious`) if a match is found.
+    *   **Real-Time Threat Intelligence:** Integrates with VirusTotal to provide real-time IP reputation checks.
     *   **DNS Lookup:** Performs a reverse DNS lookup to identify the hostname of the source IP address, providing more context for threat analysis.
+
+*   **Web Dashboard:** The web dashboard has been enhanced with the following features:
+    *   **Alert Filtering:** Filter alerts by source IP, destination IP, attack type, and time range.
 
 *   **Indication of Attack (IoA):** A new `attack_type` column has been added to the `alerts` table in `alerts.db`. This column categorizes the type of attack detected (e.g., "Signature Match", "Anomaly Detection", "Brute Force", "DNS Tunneling") and is displayed on the dashboard for quick visualization of attack trends.
 
